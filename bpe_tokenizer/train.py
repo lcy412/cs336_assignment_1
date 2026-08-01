@@ -1,12 +1,19 @@
-from cs336_basics.src.bpe_tokenizer.pretokenizer import pretokenize
+from cs336_basics.src.bpe_tokenizer.pretokenizer import pretokenize, split_by_special_tokens
 import collections
 from collections.abc import Iterator
+from typing import overload
+import os
+from multiprocessing import Pool
+
+
+
 
 class Node:
     def __init__(self, token: bytes):
         self.token = token
         self.prev: Node | None = None
         self.next: Node | None = None
+        self.count: int = 0
         
 class OrderedSet:
     
@@ -53,17 +60,15 @@ def initialize_vocab(special_tokens: list[str]) -> dict[int, bytes]:
         
     
 
-def merge(inverted_index: dict[tuple[bytes,bytes],OrderedSet[Node]], pair:tuple[bytes, bytes], pair_counts: dict[tuple[bytes, bytes], int],pretoken_chains: dict[Node,int]) -> tuple[dict[tuple[bytes, bytes], int], dict[tuple[bytes,bytes],OrderedSet[Node]]] :
+def merge(inverted_index: dict[tuple[bytes,bytes],OrderedSet[Node]], pair:tuple[bytes, bytes], pair_counts: dict[tuple[bytes, bytes], int]) -> tuple[dict[tuple[bytes, bytes], int], dict[tuple[bytes,bytes],OrderedSet[Node]]] :
     while inverted_index[pair]:
         node=inverted_index[pair].pop()
+        pretoken_count=node.count
         
         if node.token==pair[0] and node.next is not None and node.next.token==pair[1]:
         
             new_token=pair[0]+pair[1]
-            head=node
-            while head.prev is not None:
-                head=head.prev 
-            pretoken_count=pretoken_chains[head]
+            
             
             if node.next.next is not None:
                 
@@ -108,25 +113,25 @@ def merge(inverted_index: dict[tuple[bytes,bytes],OrderedSet[Node]], pair:tuple[
 
        
         
-def get_pretoken_counts(pretoken_list: list[list[bytes]]) -> tuple[dict[tuple[bytes], int],dict[Node,int],dict[tuple[bytes,bytes],OrderedSet[Node]]]:
+
+
+def initialize_state(pretoken_counts: dict[tuple[bytes],int]) -> tuple[dict[tuple[bytes], int],dict[Node,int],dict[tuple[bytes,bytes],OrderedSet[Node]]]:
+
     
-    pretoken_counts={}
     pretoken_chains={}
     pair_counts={}
     inverted_index=collections.defaultdict(OrderedSet)
     
-    for pretoken in pretoken_list:
-        key=tuple(pretoken)
-        pretoken_counts[key]=pretoken_counts.get(key,0)+1
-        
+    
     for pretoken_tuple,count in pretoken_counts.items():
-        # print(pretoken_tuple[0],count)
         node=Node(pretoken_tuple[0])
+        node.count=count
         pretoken_chains[node]=count
         for i in range(1,len(pretoken_tuple)):
             next_node=Node(pretoken_tuple[i])
             node.next=next_node
             next_node.prev=node
+            next_node.count=count
             node=next_node
       
     for node, count in pretoken_chains.items():
@@ -136,53 +141,50 @@ def get_pretoken_counts(pretoken_list: list[list[bytes]]) -> tuple[dict[tuple[by
             pair_counts[pair]=pair_counts.get(pair,0)+count
             node=node.next
             
-        
     
     
     return pair_counts, pretoken_chains, inverted_index
 
-
-def get_pair_counts_and_inverted_index(pretoken_counts: dict[tuple[bytes], int], special_token_tuples: tuple[tuple[bytes]]) -> tuple[dict[tuple[bytes, bytes], int], dict[tuple[bytes, bytes], OrderedSet[tuple[bytes]]]]:
-    pairs_count={}
-    inverted_index=collections.defaultdict(OrderedSet)
-    
-    for pretoken_tuple, count in pretoken_counts.items():
-        
-        if pretoken_tuple in special_token_tuples:
-            continue
-        if len(pretoken_tuple)==1:
-            continue
-        for i in range(len(pretoken_tuple)-1):
-            pair=(pretoken_tuple[i],pretoken_tuple[i+1])
-            pairs_count[pair]=pairs_count.get(pair,0)+count
-            
-            
-            inverted_index[pair].add(pretoken_tuple)
-            
-
-            
-    if not pairs_count:
-        return {},{}
-
-    # pair = max(pairs_count,key=lambda x: (pairs_count[x],x))
-    return pairs_count, inverted_index
-
-
-
+def get_pretoken_counts(pretoken_list: list[list[bytes]]) -> dict[tuple[bytes], int]:
+    pretoken_counts={}
+    for pretoken in pretoken_list:
+        key=tuple(pretoken)
+        pretoken_counts[key]=pretoken_counts.get(key,0)+1
+    return pretoken_counts
            
 def train_bpe_tokenizer(input_file:str, vocab_size:int, special_tokens: list[str]):
-    
+    num_workers = os.cpu_count()
     vocab=initialize_vocab(special_tokens)
+    
 
     merges=[]
         
         
     with open(input_file, "r", encoding='utf-8') as f:
         text=f.read()      
-        pretokenized_tokens=pretokenize(text,special_tokens)
-        pretoken_list=list(transform_strs_to_bytes(pretokenized_tokens,special_tokens))
         
-        pair_counts,pretoken_chains,inverted_index=get_pretoken_counts(pretoken_list)
+        documents = split_by_special_tokens(text, special_tokens)
+        chunk_size = max(1, len(documents) // num_workers)
+    
+        chunks = [documents[i:i + chunk_size] for i in range(0, len(documents), chunk_size)]
+        
+        with Pool(num_workers) as pool:
+            results = pool.starmap(process_chunk, [(chunk, special_tokens) for chunk in chunks])
+            
+            
+        global_counts = {}
+        for result in results:
+            for key, count in result.items():
+                global_counts[key] = global_counts.get(key, 0) + count
+                
+        pair_counts, pretoken_chains, inverted_index = initialize_state(global_counts)
+        
+        
+        # pretokenized_tokens=pretokenize(text,special_tokens)
+        # pretoken_list=list(transform_strs_to_bytes(pretokenized_tokens,special_tokens))
+        
+        # pretoken_counts=get_pretoken_counts(pretoken_list)
+        # pair_counts,pretoken_chains,inverted_index=initialize_state(pretoken_counts)
         
         
         while len(vocab)<vocab_size:
@@ -191,11 +193,28 @@ def train_bpe_tokenizer(input_file:str, vocab_size:int, special_tokens: list[str
             pair=max(pair_counts,key=lambda x: (pair_counts[x],x))
             new_token=pair[0]+pair[1]
             vocab[len(vocab)]=new_token
-            pair_counts, inverted_index=merge(inverted_index,pair,pair_counts,pretoken_chains)
+            pair_counts, inverted_index=merge(inverted_index,pair,pair_counts)
             merges.append(pair)
             
             
     return vocab, merges
+
+
+    
+
+def process_chunk(document_chunks:list[str],special_tokens:list[str])->dict[tuple[bytes], int]:
+    pretoken_counts={}
+    for document in document_chunks:
+        pretokenized_tokens=pretokenize(document,special_tokens)
+        
+        for pretoken in transform_strs_to_bytes(pretokenized_tokens, special_tokens):
+            key=tuple(pretoken)
+            pretoken_counts[key]=pretoken_counts.get(key,0)+1
+            
+    return pretoken_counts
+    
+    
+    
         
 
                 
