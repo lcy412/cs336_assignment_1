@@ -28,6 +28,8 @@ class OrderedSet:
         return x in self._d     
     def clear(self):
         self._d.clear()   
+    def __class_getitem__(cls, item):
+        return cls
         
 
 def transform_strs_to_bytes(pretokens: list[str], special_tokens: list[str]) -> Iterator[list[bytes]]:
@@ -98,8 +100,6 @@ def merge(inverted_index: dict[tuple[bytes,bytes],OrderedSet[Node]], pair:tuple[
         
     inverted_index[pair].clear()  
     pair_counts[pair]=0
-    
-    # pair=max(pair_counts,key=lambda x: (pair_counts[x],x))
     
     return pair_counts, inverted_index
         
