@@ -3,6 +3,9 @@ def split_by_special_tokens(tokens: str, special_tokens: list[str]) -> list[str]
     """
     Split the input tokens by the special tokens.
     """
+    if not special_tokens:
+        return [tokens]
+    
     sorted_special_tokens = sorted(special_tokens, key=len, reverse=True)
     
     special_token_pattern="|".join(re.escape(special_token) for special_token in sorted_special_tokens)

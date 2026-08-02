@@ -152,14 +152,24 @@ def get_pretoken_counts(pretoken_list: list[list[bytes]]) -> dict[tuple[bytes], 
         pretoken_counts[key]=pretoken_counts.get(key,0)+1
     return pretoken_counts
            
+def process_chunk(document_chunks:list[str],special_tokens:list[str])->dict[tuple[bytes], int]:
+    pretoken_counts={}
+    for document in document_chunks:
+        pretokenized_tokens=pretokenize(document,special_tokens)
+        
+        for pretoken in transform_strs_to_bytes(pretokenized_tokens, special_tokens):
+            key=tuple(pretoken)
+            pretoken_counts[key]=pretoken_counts.get(key,0)+1
+            
+    return pretoken_counts
+    
+    
 def train_bpe_tokenizer(input_file:str, vocab_size:int, special_tokens: list[str]):
     num_workers = os.cpu_count()
     vocab=initialize_vocab(special_tokens)
     
 
     merges=[]
-        
-        
     with open(input_file, "r", encoding='utf-8') as f:
         text=f.read()      
         
@@ -202,19 +212,8 @@ def train_bpe_tokenizer(input_file:str, vocab_size:int, special_tokens: list[str
 
     
 
-def process_chunk(document_chunks:list[str],special_tokens:list[str])->dict[tuple[bytes], int]:
-    pretoken_counts={}
-    for document in document_chunks:
-        pretokenized_tokens=pretokenize(document,special_tokens)
-        
-        for pretoken in transform_strs_to_bytes(pretokenized_tokens, special_tokens):
-            key=tuple(pretoken)
-            pretoken_counts[key]=pretoken_counts.get(key,0)+1
-            
-    return pretoken_counts
-    
-    
-    
+
+
         
 
                 
