@@ -42,3 +42,32 @@ def transformer_block(d_model: int, num_heads: int, d_ff: int,max_seq_len: int, 
     return x
     
     
+def transformer_lm(d_model: int, num_heads: int, d_ff: int, theta: float, weights: torch.Tensor, in_features: torch.Tensor, vocab_size: int, context_length: int,num_layers: int) -> torch.Tensor:
+    embedding=linear.Embedding(vocab_size,d_model)
+    embedding.weight.data=weights["token_embeddings.weight"]
+    x=embedding(in_features)
+    
+    def extract_block_weights(state_dict: dict, layer_idx: int) -> dict:
+        block_weights={}
+        prefix=f"layers.{layer_idx}."
+        
+        for k,v in state_dict.items():
+            if k.startswith(prefix):
+                new_k=k[len(prefix):]
+                block_weights[new_k]=v
+                
+        return block_weights
+    
+    for _ in range(num_layers):
+        local_weights=extract_block_weights(weights,_)
+        x=transformer_block(d_model, num_heads, d_ff,context_length, theta, local_weights, x)
+        
+    norm=functional.RMSNorm(d_model)
+    norm.gain.data=weights["ln_final.weight"]
+    x=norm(x)
+    
+    lm_head=linear.Linear(d_model,vocab_size)
+    lm_head.weight.data=weights["lm_head.weight"]
+    x=lm_head(x)
+    
+    return x

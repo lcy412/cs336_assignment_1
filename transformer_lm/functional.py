@@ -43,6 +43,8 @@ def softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return torch.exp(x-max_value)/torch.sum(torch.exp(x-max_value),dim=dim,keepdim=True)
 
 
-   
+def silu(x: torch.Tensor) -> torch.Tensor:
+    return x*torch.sigmoid(x)
+    
         
 
