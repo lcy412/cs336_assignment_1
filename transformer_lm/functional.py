@@ -34,43 +34,7 @@ class PositionWiseFFN(torch.nn.Module):
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.W2(self.silu(self.W1(x))*self.W3(x))
-    
-class RotaryPositionalEmbedding(torch.nn.Module):
-    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
-        super().__init__()
-        self.theta=theta
-        self.d_k=d_k
-        self.max_seq_len=max_seq_len
-        self.device=device
-        frequency_vec=torch.arange(0,d_k,2,device=device)/d_k
-        frequency_vec=self.theta**(-frequency_vec)
-        self.frequency_vec=frequency_vec
-        
-        
-    
-    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
-        self.angle=einsum(token_positions,self.frequency_vec,"... seq_len, f-> ... seq_len f ")
-        cos_vec=torch.cos(self.angle)
-        cos_vec=torch.repeat_interleave(cos_vec,2,dim=-1)
-        sin_vec=torch.sin(self.angle)
-        sin_vec=torch.repeat_interleave(sin_vec,2,dim=-1)
-        
-        x_even=x[...,0::2]
-        x_odd=-x[...,1::2]
-        
-        x_flip=rearrange([x_odd,x_even], "two ... dk_2 -> ... ( dk_2 two)")
-        
-        return einsum(cos_vec,x,"... seq_len d_model,... seq_len d_model -> ... seq_len d_model")+einsum(sin_vec,x_flip,"... seq_len d_model,... seq_len d_model -> ... seq_len d_model")
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+      
         
         
 def softmax(x: torch.Tensor, dim: int = -1) -> torch.Tensor:
