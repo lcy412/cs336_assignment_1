@@ -22,9 +22,13 @@ class RMSNorm(torch.nn.Module):
         return result.to(in_dtype)
     
 class PositionWiseFFN(torch.nn.Module):
-    def __init__(self, d_model: int, device=None, dtype=None):
+    def __init__(self, d_model: int, d_ff:int |None=None,device=None, dtype=None):
         super().__init__()  
-        self.d_ff=int(np.ceil(d_model*(8/3)/64))*64
+        if d_ff is not None:
+            self.d_ff=d_ff
+        else:
+            self.d_ff=int(np.ceil(d_model*(8/3)/64))*64
+        
         self.W1=Linear(d_model, self.d_ff, device=device, dtype=dtype)
         self.W2=Linear(self.d_ff, d_model, device=device, dtype=dtype)
         self.W3=Linear(d_model, self.d_ff, device=device, dtype=dtype)
