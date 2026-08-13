@@ -4,6 +4,7 @@ import numpy as np
 from cs336_basics.src.transformer_lm.functional import softmax
 from cs336_basics.src.transformer_lm.linear import Linear
 class RotaryPositionalEmbedding(torch.nn.Module):
+    
     def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
         super().__init__()
         self.theta=theta

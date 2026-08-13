@@ -51,4 +51,13 @@ def silu(x: torch.Tensor) -> torch.Tensor:
     return x*torch.sigmoid(x)
     
         
-
+def cross_entropy(x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    
+    
+    max_value=torch.max(x,dim=-1,keepdim=True)[0]
+    x=x-max_value
+    
+    return torch.mean((torch.log(torch.sum(torch.exp(x),dim=-1,keepdim=True)))-(torch.gather(x, dim=-1, index=target.unsqueeze(-1))))
+    
+    
+    
