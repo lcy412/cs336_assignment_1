@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 import torch 
 import numpy as np
 from cs336_basics.src.transformer_lm.linear import Linear
@@ -53,11 +54,40 @@ def silu(x: torch.Tensor) -> torch.Tensor:
         
 def cross_entropy(x: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     
-    
     max_value=torch.max(x,dim=-1,keepdim=True)[0]
     x=x-max_value
-    
     return torch.mean((torch.log(torch.sum(torch.exp(x),dim=-1,keepdim=True)))-(torch.gather(x, dim=-1, index=target.unsqueeze(-1))))
     
+    
+def get_lr_schedule(step: int, max_lr: float, min_lr: float, t_warmup : int, t_final:int) -> float:
+    if step<t_warmup:
+        return (step/t_warmup)*max_lr
+    if step>=t_warmup and step<=t_final:
+        return min_lr+0.5*(1+np.cos(np.pi*(step-t_warmup)/(t_final-t_warmup)))*(max_lr-min_lr)
+    if step>t_final:
+        return min_lr
+    
+def gradient_clipping(params: Iterable[torch.nn.Parameter], max_norm: float = 1.0) -> None:
+    eps=1e-6
+    l2_norm_sum=0
+    params=list(params)
+    for param in params:
+        if param.grad is not None:
+            l2_norm_sum+=torch.sum(param.grad.data**2).item()
+    l2_norm_sum=np.sqrt(l2_norm_sum)
+            
+    if l2_norm_sum>max_norm:
+        for param in params:
+            if param.grad is not None:
+                param.grad.data*=max_norm/(l2_norm_sum+eps)
+                           
+    return None
+                
+            
+            
+            
+        
+        
+        
     
     
