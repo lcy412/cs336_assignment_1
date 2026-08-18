@@ -81,7 +81,6 @@ def merge(inverted_index: dict[tuple[bytes,bytes],OrderedSet[Node]], pair:tuple[
                 inverted_index[new_pair_tail].add(node)
                 pair_counts[new_pair_tail]=pair_counts.get(new_pair_tail,0)+pretoken_count
                 pair_counts[old_pair_tail]=pair_counts.get(old_pair_tail,0)-pretoken_count
-                # inverted_index[pair].remove(node)
                 pair_counts[pair]=pair_counts.get(pair,0)-pretoken_count
             else:
                 
