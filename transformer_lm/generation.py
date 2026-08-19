@@ -5,7 +5,7 @@ def top_p_filter(probs, top_p):
     sorted_probs, sorted_indices=torch.sort(probs,dim=-1,descending=True)
     
     cumulative_probs=torch.cumsum(sorted_probs, dim=-1)
-    mask = cumulative_probs - sorted >=top_p
+    mask = cumulative_probs - sorted_probs >=top_p
     sorted_probs[mask] = 0
     
     filtered_probs=torch.zeros_like(probs).scatter_(-1,sorted_indices,sorted_probs)
@@ -13,11 +13,6 @@ def top_p_filter(probs, top_p):
     filtered_probs=filtered_probs/torch.sum(filtered_probs,dim=-1,keepdim=True)
     
     return filtered_probs
-    
-    
-    
-    
-    
 
     
     

@@ -41,6 +41,8 @@ def scaled_dot_product_attention(
     d_k=Q.shape[-1]
     
     if mask is not None:
+        if mask.device != Q.device:
+            mask = mask.to(Q.device)
         num_mask=torch.where(mask,0,-np.inf)
         
         attention_scores=(einsum(Q,K,"... queries d_k, ... keys d_k -> ... queries keys"))/np.sqrt(d_k)+num_mask

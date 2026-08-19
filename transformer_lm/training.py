@@ -25,7 +25,10 @@ def get_batch(dataset: np.ndarray, batch_size: int, context_length:int, device: 
 
 def save_checkpoint(model, optimizer, iteration, out):
     checkpoint={}
-    checkpoint["model"]=model.state_dict()
+    if hasattr(model, "_orig_mod"):
+        checkpoint["model"] = model._orig_mod.state_dict()
+    else:
+        checkpoint["model"] = model.state_dict()
     checkpoint["optimizer"]=optimizer.state_dict()
     checkpoint["iteration"]=iteration
     
